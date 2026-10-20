@@ -5,7 +5,7 @@ import { STLLoader } from 'three/addons/loaders/STLLoader.js';
 import { PLYLoader } from 'three/addons/loaders/PLYLoader.js';
 
 const OWNER = 'raphaelrichertg-png', REPO = 'SYNINC-500', BRANCH = 'main';
-const MESH_DIR = '../meshes/';
+const MESH_DIR = 'https://raw.githubusercontent.com/raphaelrichertg-png/SYNINC-500/main/meshes/';
 const MESH_RE = /\.(obj|stl|ply)$/i;
 
 const listEl = document.getElementById('list');
@@ -146,7 +146,7 @@ let meshes = [];
 
 async function listMeshes() {
   try {
-    const r = await fetch('../index.json');
+    const r = await fetch('index.json');
     if (r.ok) {
       const j = await r.json();
       if (Array.isArray(j) && j.length)
