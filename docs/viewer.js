@@ -2,9 +2,11 @@ import * as THREE from 'three';
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
 import { OBJLoader } from 'three/addons/loaders/OBJLoader.js';
 import { STLLoader } from 'three/addons/loaders/STLLoader.js';
+import { PLYLoader } from 'three/addons/loaders/PLYLoader.js';
 
 const OWNER = 'raphaelrichertg-png', REPO = 'SYNINC-500', BRANCH = 'main';
 const MESH_DIR = '../meshes/';
+const MESH_RE = /\.(obj|stl|ply)$/i;
 
 const listEl = document.getElementById('list');
 const countEl = document.getElementById('count');
@@ -73,10 +75,15 @@ async function listMeshes() {
         return j.map(e => typeof e === 'string' ? e : e.file || e.name);
     }
   } catch (e) {}
-  const r = await fetch('https://api.github.com/repos/' + OWNER + '/' + REPO + '/contents/meshes?ref=' + BRANCH + '&per_page=1000');
-  if (!r.ok) throw new Error('Cannot list meshes/ (HTTP ' + r.status + ')');
-  const files = await r.json();
-  return files.filter(f => f.type === 'file' && /\.(obj|stl)$/i.test(f.name)).map(f => f.name);
+  let files = [];
+  for (let page = 1; page <= 10; page++) {
+    const r = await fetch('https://api.github.com/repos/' + OWNER + '/' + REPO + '/contents/meshes?ref=' + BRANCH + '&per_page=1000&page=' + page);
+    if (!r.ok) throw new Error('Cannot list meshes/ (HTTP ' + r.status + ')');
+    const part = await r.json();
+    files = files.concat(part);
+    if (part.length < 1000) break;
+  }
+  return files.filter(f => f.type === 'file' && MESH_RE.test(f.name)).map(f => f.name);
 }
 
 async function loadMesh(vp, name) {
@@ -85,6 +92,13 @@ async function loadMesh(vp, name) {
   if (/\.stl$/i.test(name)) {
     const geo = await new Promise((ok, ko) => new STLLoader().load(url, ok, undefined, ko));
     object = new THREE.Mesh(geo, baseMaterial());
+  } else if (/\.ply$/i.test(name)) {
+    const geo = await new Promise((ok, ko) => new PLYLoader().load(url, ok, undefined, ko));
+    geo.computeVertexNormals();
+    const hasColor = !!geo.getAttribute('color');
+    const mat = baseMaterial();
+    if (hasColor) { mat.vertexColors = true; mat.color.set(0xffffff); }
+    object = new THREE.Mesh(geo, mat);
   } else {
     object = await new Promise((ok, ko) => new OBJLoader().load(url, ok, undefined, ko));
     object.traverse(c => { if (c.isMesh) c.material = baseMaterial(); });
@@ -161,7 +175,7 @@ document.getElementById('search').oninput = e => renderList(e.target.value);
     countEl.textContent = meshes.length + ' surfaces';
     renderList('');
     if (meshes.length) select(meshes[0], 0);
-    else statusEl.textContent = 'meshes/ folder is empty — add your .obj files.';
+    else statusEl.textContent = 'meshes/ folder is empty — add your surface files.';
   } catch (e) {
     statusEl.textContent = 'Error: ' + e.message;
     countEl.textContent = '—';
