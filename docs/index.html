@@ -24,13 +24,16 @@
     <input id="search" type="search" placeholder="Filter by name…">
     <ul id="list"></ul>
   </aside>
-  <section id="viewports">
-    <div class="vp" id="vp1"></div>
-    <div class="vp hidden" id="vp2"></div>
-  </section>
+  <section id="grid"></section>
 </main>
 <footer>
-  <label><input type="checkbox" id="compare"> Compare two surfaces</label>
+  <label>Grid <select id="gridSize">
+    <option value="1" selected>1</option>
+    <option value="2">2</option>
+    <option value="4">4</option>
+    <option value="6">6</option>
+  </select></label>
+  <label><input type="checkbox" id="linkCam" checked> Linked cameras</label>
   <label>Opacity <input type="range" id="opacity" min="0" max="100" value="100"></label>
   <label><input type="checkbox" id="wireframe"> Wireframe</label>
   <button id="reset">Reset view</button>
