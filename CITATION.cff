@@ -1,0 +1,20 @@
+cff-version: 1.2.0
+title: "SYNINC-500: SYNthetic INCisor dataset"
+message: "500 synthetic maxillary central incisor surfaces generated with DeepSDF"
+authors:
+  - family-names: Richert
+    given-names: Raphaël
+  - family-names: Lahoud
+    given-names: Pierre
+  - family-names: Valette
+    given-names: Sébastien
+  - family-names: Ducret
+    given-names: Maxime
+type: dataset
+keywords:
+  - dentistry
+  - 3D shape
+  - DeepSDF
+  - synthetic data
+  - incisor
+license: CC-BY-4.0

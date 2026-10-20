@@ -1,0 +1,41 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>SYNINC-500 — Incisor surface viewer</title>
+<link rel="stylesheet" href="style.css">
+<script type="importmap">
+{
+  "imports": {
+    "three": "https://unpkg.com/three@0.160.0/build/three.module.js",
+    "three/addons/": "https://unpkg.com/three@0.160.0/examples/jsm/"
+  }
+}
+</script>
+</head>
+<body>
+<header>
+  <h1>SYNINC-500</h1>
+  <span id="count">loading…</span>
+</header>
+<main>
+  <aside>
+    <input id="search" type="search" placeholder="Filter by name…">
+    <ul id="list"></ul>
+  </aside>
+  <section id="viewports">
+    <div class="vp" id="vp1"></div>
+    <div class="vp hidden" id="vp2"></div>
+  </section>
+</main>
+<footer>
+  <label><input type="checkbox" id="compare"> Compare two surfaces</label>
+  <label>Opacity <input type="range" id="opacity" min="0" max="100" value="100"></label>
+  <label><input type="checkbox" id="wireframe"> Wireframe</label>
+  <button id="reset">Reset view</button>
+  <span id="status"></span>
+</footer>
+<script type="module" src="viewer.js"></script>
+</body>
+</html>
