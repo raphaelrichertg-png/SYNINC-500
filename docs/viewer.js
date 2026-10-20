@@ -194,10 +194,8 @@ document.getElementById('reset').onclick = () => { for (const c of cells) c.rese
     countEl.textContent = meshes.length + ' surfaces';
     renderList('');
     setGrid(1);
-    if (meshes.length) {
-      const c = pickCell();
-      await loadInto(c, meshes[0]);
-    } else statusEl.textContent = 'meshes/ folder is empty.';
+    if (!meshes.length) statusEl.textContent = 'meshes/ folder is empty.';
+    // no auto-load — click a surface in the list to display it
   } catch (e) {
     statusEl.textContent = 'Error: ' + e.message;
     countEl.textContent = '—';
