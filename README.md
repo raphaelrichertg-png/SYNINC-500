@@ -7,13 +7,13 @@ The shapes are generated with DeepSDF latent interpolation: a DeepSDF model trai
 ## Contents
 
 - `meshes/` — the 500 surfaces (`.ply`)
-- `docs/` — online 3D viewer (GitHub Pages)
+- `index.html`, `viewer.js`, `style.css` — online 3D viewer (GitHub Pages)
 
 ## Visualisation
 
 > https://raphaelrichertg-png.github.io/SYNINC-500/
 
-Static three.js viewer: browse the surfaces, rotate/zoom, adjust opacity and wireframe, compare two surfaces side by side.
+Static three.js viewer: browse the surfaces, rotate/zoom, adjust opacity and wireframe, display several surfaces side by side.
 
 ## Citation
 
