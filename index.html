@@ -1,1 +1,44 @@
-successfully downloaded text file (SHA: a71ad9d0a54741bd135ca597102fe7c5ec875fb8)
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>SYNINC-500 — Incisor surface viewer</title>
+<link rel="stylesheet" href="style.css">
+<script type="importmap">
+{
+  "imports": {
+    "three": "https://unpkg.com/three@0.160.0/build/three.module.js",
+    "three/addons/": "https://unpkg.com/three@0.160.0/examples/jsm/"
+  }
+}
+</script>
+</head>
+<body>
+<header>
+  <h1>SYNINC-500</h1>
+  <span id="count">loading…</span>
+</header>
+<main>
+  <aside>
+    <input id="search" type="search" placeholder="Filter by name…">
+    <ul id="list"></ul>
+  </aside>
+  <section id="grid"></section>
+</main>
+<footer>
+  <label>Grid <select id="gridSize">
+    <option value="1" selected>1</option>
+    <option value="2">2</option>
+    <option value="4">4</option>
+    <option value="6">6</option>
+  </select></label>
+  <label><input type="checkbox" id="linkCam" checked> Linked cameras</label>
+  <label>Opacity <input type="range" id="opacity" min="0" max="100" value="100"></label>
+  <label><input type="checkbox" id="wireframe"> Wireframe</label>
+  <button id="reset">Reset view</button>
+  <span id="status"></span>
+</footer>
+<script type="module" src="viewer.js"></script>
+</body>
+</html>

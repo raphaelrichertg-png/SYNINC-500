@@ -1,1 +1,26 @@
-successfully downloaded text file (SHA: 34790c0944589be6703fa49465bc31c2e1135d2d)
+* { box-sizing: border-box; }
+html, body { margin: 0; height: 100%; font-family: system-ui, sans-serif; }
+body { display: flex; flex-direction: column; background: #1b1f23; color: #e8e8e8; }
+header { display: flex; align-items: baseline; gap: 1rem; padding: 0.6rem 1rem; border-bottom: 1px solid #333; }
+header h1 { font-size: 1.1rem; margin: 0; }
+header #count { opacity: 0.6; font-size: 0.85rem; }
+main { flex: 1; display: flex; min-height: 0; }
+aside { width: 230px; border-right: 1px solid #333; display: flex; flex-direction: column; min-height: 0; }
+#search { margin: 0.5rem; padding: 0.4rem; background: #262b30; color: #eee; border: 1px solid #444; border-radius: 4px; }
+#list { flex: 1; overflow-y: auto; margin: 0; padding: 0 0.5rem; list-style: none; }
+#list li { padding: 0.3rem 0.5rem; border-radius: 4px; cursor: pointer; font-size: 0.82rem; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+#list li:hover { background: #2a3138; }
+#list li.active { background: #35618e; }
+#grid { flex: 1; display: grid; gap: 2px; min-width: 0; }
+#grid.n1 { grid-template-columns: 1fr; }
+#grid.n2 { grid-template-columns: 1fr 1fr; }
+#grid.n4 { grid-template-columns: 1fr 1fr; grid-template-rows: 1fr 1fr; }
+#grid.n6 { grid-template-columns: 1fr 1fr 1fr; grid-template-rows: 1fr 1fr; }
+.cell { position: relative; min-width: 0; min-height: 0; border: 1px solid #2a3036; border-radius: 3px; overflow: hidden; background: #14171a; }
+.cell .label { position: absolute; left: 6px; bottom: 4px; font-size: 0.72rem; opacity: 0.75; pointer-events: none; text-shadow: 0 1px 2px #000; max-width: calc(100% - 12px); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.cell .close { position: absolute; top: 4px; right: 6px; cursor: pointer; opacity: 0.5; font-size: 0.9rem; }
+.cell .close:hover { opacity: 1; }
+footer { display: flex; align-items: center; gap: 1.2rem; padding: 0.4rem 1rem; border-top: 1px solid #333; font-size: 0.85rem; }
+footer label { display: flex; align-items: center; gap: 0.4rem; }
+footer select, footer input[type=range] { background: #262b30; color: #eee; }
+#status { margin-left: auto; opacity: 0.6; }
