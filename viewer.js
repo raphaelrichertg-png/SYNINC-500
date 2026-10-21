@@ -1,8 +1,8 @@
 import * as THREE from 'three';
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
+import { PLYLoader } from 'three/addons/loaders/PLYLoader.js';
 import { OBJLoader } from 'three/addons/loaders/OBJLoader.js';
 import { STLLoader } from 'three/addons/loaders/STLLoader.js';
-import { PLYLoader } from 'three/addons/loaders/PLYLoader.js';
 
 const OWNER = 'raphaelrichertg-png', REPO = 'SYNINC-500', BRANCH = 'main';
 const MESH_DIR = 'meshes/';
@@ -17,35 +17,8 @@ const wireEl = document.getElementById('wireframe');
 const linkEl = document.getElementById('linkCam');
 const gridSel = document.getElementById('gridSize');
 
-function usableColors(geo) {
-  const col = geo.getAttribute('color');
-  if (!col) return false;
-  let min = Infinity, max = -Infinity;
-  for (let i = 0; i < col.count; i++) {
-    const v = col.getX(i) + col.getY(i) + col.getZ(i);
-    if (v < min) min = v;
-    if (v > max) max = v;
-  }
-  return (max - min) > 1e-6;
-}
-
-// drop invalid/zero/NaN normals and recompute
-function fixNormals(geo) {
-  const n = geo.getAttribute('normal');
-  let bad = !n;
-  if (!bad) {
-    for (let i = 0; i < n.count; i++) {
-      const l = n.getX(i) * n.getX(i) + n.getY(i) * n.getY(i) + n.getZ(i) * n.getZ(i);
-      if (!(l > 0.01)) { bad = true; break; }  // catches zero and NaN
-    }
-  }
-  if (bad) {
-    geo.deleteAttribute('normal');
-    geo.computeVertexNormals();
-    return 'recomputed';
-  }
-  return 'ok';
-}
+// shared camera state (desk-like linked viewers)
+const camState = { target: new THREE.Vector3(), position: new THREE.Vector3(0, 0, 2), near: 0.001, far: 10000 };
 
 class Cell {
   constructor() {
@@ -63,15 +36,15 @@ class Cell {
     this.renderer.setPixelRatio(window.devicePixelRatio);
     this.el.appendChild(this.renderer.domElement);
     this.scene = new THREE.Scene();
-    this.scene.background = new THREE.Color(0x14171a);
+    this.scene.background = new THREE.Color(0x3a3f46);
     this.camera = new THREE.PerspectiveCamera(45, 1, 0.001, 10000);
-    this.camera.position.set(0, 0, 2);
+    this.camera.position.copy(camState.position);
     this.controls = new OrbitControls(this.camera, this.renderer.domElement);
-    this.scene.add(new THREE.HemisphereLight(0xffffff, 0x555555, 1.0));
+    this.scene.add(new THREE.HemisphereLight(0xffffff, 0x666666, 1.0));
     const dir = new THREE.DirectionalLight(0xffffff, 1.5);
     dir.position.set(3, 5, 4);
     this.scene.add(dir);
-    const dir2 = new THREE.DirectionalLight(0xffffff, 0.8);
+    const dir2 = new THREE.DirectionalLight(0xffffff, 0.9);
     dir2.position.set(-3, -2, -4);
     this.scene.add(dir2);
     this.group = new THREE.Group();
@@ -79,47 +52,60 @@ class Cell {
     this.name = null;
 
     this.controls.addEventListener('change', () => {
-      if (linkEl.checked) syncCameras(this);
+      if (linkEl.checked) {
+        camState.target.copy(this.controls.target);
+        camState.position.copy(this.camera.position);
+        for (const c of cells) if (c !== this) {
+          c.camera.position.copy(this.camera.position);
+          c.controls.target.copy(this.controls.target);
+          c.controls.update();
+        }
+      }
     });
     this.close.onclick = () => { this.el.remove(); this.renderer.dispose(); cells.delete(this); };
-    new ResizeObserver(() => this.resize()).observe(this.el);
+
+    const ro = new ResizeObserver(() => this.resize());
+    ro.observe(this.el);
+    // explicit initial sizing next frame (grid layout settled)
+    requestAnimationFrame(() => { this.resize(); });
   }
   resize() {
-    const w = this.el.clientWidth, h = this.el.clientHeight;
-    if (!w || !h) return;
-    this.renderer.setSize(w, h);
+    const w = this.el.clientWidth || this.el.getBoundingClientRect().width;
+    const h = this.el.clientHeight || this.el.getBoundingClientRect().height;
+    if (!w || !h) return false;
+    this.renderer.setSize(w, h, false);
+    this.renderer.domElement.style.width = '100%';
+    this.renderer.domElement.style.height = '100%';
     this.camera.aspect = w / h;
     this.camera.updateProjectionMatrix();
+    return true;
   }
   clear() { while (this.group.children.length) this.group.remove(this.group.children[0]); }
-  resetView() {
+  frame() {
     const box = new THREE.Box3().setFromObject(this.group);
     if (box.isEmpty()) return;
     const center = box.getCenter(new THREE.Vector3());
-    const size = Math.max(box.getSize(new THREE.Vector3()).length(), 1e-6);
+    const size = Math.max(box.getSize(new THREE.Vector3()).length(), 1e-9);
     this.controls.target.copy(center);
     this.camera.position.copy(center).add(new THREE.Vector3(0, 0, size * 1.4));
-    this.camera.near = size / 100;
-    this.camera.far = size * 100;
+    this.camera.near = Math.max(size / 100, 1e-9);
+    this.camera.far = Math.max(size * 100, 10);
     this.camera.updateProjectionMatrix();
     this.controls.update();
+    camState.target.copy(this.controls.target);
+    camState.position.copy(this.camera.position);
+    if (linkEl.checked) for (const c of cells) if (c !== this) {
+      c.camera.position.copy(this.camera.position);
+      c.controls.target.copy(this.controls.target);
+      c.camera.near = this.camera.near; c.camera.far = this.camera.far;
+      c.camera.updateProjectionMatrix();
+      c.controls.update();
+    }
   }
   render() { this.renderer.render(this.scene, this.camera); }
 }
 
 const cells = new Set();
-
-function syncCameras(source) {
-  for (const c of cells) {
-    if (c === source) continue;
-    c.camera.position.copy(source.camera.position);
-    c.camera.quaternion.copy(source.camera.quaternion);
-    c.controls.target.copy(source.controls.target);
-    c.camera.near = source.camera.near; c.camera.far = source.camera.far;
-    c.camera.updateProjectionMatrix();
-    c.controls.update();
-  }
-}
 
 function animate() {
   for (const c of cells) c.render();
@@ -127,11 +113,22 @@ function animate() {
 }
 animate();
 
+function fixNormals(geo) {
+  const n = geo.getAttribute('normal');
+  let bad = !n;
+  if (!bad) for (let i = 0; i < n.count; i++) {
+    const l = n.getX(i) ** 2 + n.getY(i) ** 2 + n.getZ(i) ** 2;
+    if (!(l > 0.01)) { bad = true; break; }
+  }
+  if (bad) { geo.deleteAttribute('normal'); geo.computeVertexNormals(); return 'recomputed'; }
+  return 'ok';
+}
+
 function baseMaterial() {
-  return new THREE.MeshPhongMaterial({
-    color: 0xf2ead8, shininess: 30,
+  return new THREE.MeshStandardMaterial({
+    color: 0xf2ead8, roughness: 0.5, metalness: 0.0,
     transparent: true, opacity: opacityEl.value / 100,
-    side: THREE.DoubleSide
+    side: THREE.DoubleSide, flatShading: false
   });
 }
 
@@ -157,17 +154,20 @@ async function loadInto(cell, name) {
     const geo = await new Promise((ok, ko) => new PLYLoader().load(url, ok, undefined, ko));
     normalsState = fixNormals(geo);
     const hasFaces = geo.index && geo.index.count > 0;
-    const useColors = usableColors(geo);
     if (hasFaces) {
       const mat = baseMaterial();
-      if (useColors) { mat.vertexColors = true; mat.color.set(0xffffff); }
+      const col = geo.getAttribute('color');
+      if (col) {
+        let min = Infinity, max = -Infinity;
+        for (let i = 0; i < col.count; i++) {
+          const v = col.getX(i) + col.getY(i) + col.getZ(i);
+          if (v < min) min = v; if (v > max) max = v;
+        }
+        if (max - min > 1e-6) { mat.vertexColors = true; mat.color.set(0xffffff); }
+      }
       object = new THREE.Mesh(geo, mat);
     } else {
-      const mat = new THREE.PointsMaterial({
-        color: 0xf2ead8, size: 0.01, sizeAttenuation: true,
-        transparent: true, opacity: opacityEl.value / 100
-      });
-      if (useColors) { mat.vertexColors = true; mat.color.set(0xffffff); }
+      const mat = new THREE.PointsMaterial({ color: 0xf2ead8, size: 0.01, transparent: true, opacity: opacityEl.value / 100 });
       object = new THREE.Points(geo, mat);
     }
   } else {
@@ -178,22 +178,23 @@ async function loadInto(cell, name) {
   cell.group.add(object);
   cell.name = name;
   cell.label.textContent = name;
-  cell.resize();
-  cell.resetView();
-  cell.resize();
+  // ensure canvas has real size BEFORE framing
+  let ok = false;
+  for (let i = 0; i < 10 && !ok; i++) { ok = cell.resize(); if (!ok) await new Promise(r => setTimeout(r, 50)); }
+  cell.frame();
   applyStyle();
 
-  const info = [];
   const geo = object.isPoints || object.isMesh ? object.geometry : null;
+  const info = [];
   if (geo) {
     const pos = geo.getAttribute('position');
     const box = new THREE.Box3().setFromBufferAttribute(pos);
     const s = box.getSize(new THREE.Vector3());
     info.push(object.isPoints ? 'point cloud' : 'mesh');
-    info.push(pos.count + ' vertices');
+    info.push(pos.count + ' vtx');
     info.push(geo.index ? (geo.index.count / 3) + ' faces' : 'no faces');
-    info.push('normals: ' + normalsState);
-    info.push('size ' + s.x.toFixed(3) + 'x' + s.y.toFixed(3) + 'x' + s.z.toFixed(3));
+    info.push('normals ' + normalsState);
+    info.push('canvas ' + cell.el.clientWidth + 'x' + cell.el.clientHeight);
   }
   return info.join(', ');
 }
@@ -248,14 +249,11 @@ document.getElementById('search').oninput = e => renderList(e.target.value);
 
 function setGrid(n) {
   gridEl.className = 'n' + n;
-  setTimeout(() => { for (const c of cells) c.resize(); }, 50);
+  setTimeout(() => { for (const c of cells) c.resize(); }, 60);
 }
 gridSel.onchange = () => setGrid(+gridSel.value);
 
-document.getElementById('reset').onclick = () => {
-  for (const c of cells) c.resetView();
-  if (linkEl.checked) { const first = [...cells][0]; if (first) syncCameras(first); }
-};
+document.getElementById('reset').onclick = () => { for (const c of cells) c.frame(); };
 
 (async () => {
   try {
