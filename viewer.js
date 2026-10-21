@@ -62,10 +62,11 @@ class Cell {
     const box = new THREE.Box3().setFromObject(this.group);
     if (box.isEmpty()) return;
     const center = box.getCenter(new THREE.Vector3());
-    const size = box.getSize(new THREE.Vector3()).length();
+    const size = box.getSize(new THREE.Vector3()).length() || 1;
     this.controls.target.copy(center);
     this.camera.position.copy(center).add(new THREE.Vector3(0, 0, size));
-    this.camera.near = size / 100; this.camera.far = size * 10;
+    this.camera.near = Math.max(size / 100, 1e-6);
+    this.camera.far = Math.max(size * 100, 10);
     this.camera.updateProjectionMatrix();
     this.controls.update();
   }
@@ -103,7 +104,7 @@ function baseMaterial() {
 function applyStyle() {
   const op = opacityEl.value / 100, wire = wireEl.checked;
   for (const c of cells) c.group.traverse(o => {
-    if (!o.isMesh) return;
+    if (!o.isMesh && !o.isPoints) return;
     o.material.opacity = op;
     o.material.wireframe = wire;
   });
@@ -119,10 +120,21 @@ async function loadInto(cell, name) {
     object = new THREE.Mesh(geo, baseMaterial());
   } else if (/\.ply$/i.test(name)) {
     const geo = await new Promise((ok, ko) => new PLYLoader().load(url, ok, undefined, ko));
-    geo.computeVertexNormals();
-    const mat = baseMaterial();
-    if (geo.getAttribute('color')) { mat.vertexColors = true; mat.color.set(0xffffff); }
-    object = new THREE.Mesh(geo, mat);
+    const hasFaces = geo.index && geo.index.count > 0;
+    const hasNormals = !!geo.getAttribute('normal');
+    if (!hasNormals) geo.computeVertexNormals();
+    if (hasFaces) {
+      const mat = baseMaterial();
+      if (geo.getAttribute('color')) { mat.vertexColors = true; mat.color.set(0xffffff); }
+      object = new THREE.Mesh(geo, mat);
+    } else {
+      const mat = new THREE.PointsMaterial({
+        color: 0xe8e0d0, size: 0.5, sizeAttenuation: true,
+        transparent: true, opacity: opacityEl.value / 100
+      });
+      if (geo.getAttribute('color')) { mat.vertexColors = true; mat.color.set(0xffffff); }
+      object = new THREE.Points(geo, mat);
+    }
   } else {
     object = await new Promise((ok, ko) => new OBJLoader().load(url, ok, undefined, ko));
     object.traverse(o => { if (o.isMesh) o.material = baseMaterial(); });
@@ -131,8 +143,23 @@ async function loadInto(cell, name) {
   cell.group.add(object);
   cell.name = name;
   cell.label.textContent = name;
+  cell.resize();
   cell.resetView();
+  cell.resize();
   applyStyle();
+
+  const info = [];
+  const geo = object.isPoints || object.isMesh ? object.geometry : null;
+  if (geo) {
+    const pos = geo.getAttribute('position');
+    const box = new THREE.Box3().setFromBufferAttribute(pos);
+    const s = box.getSize(new THREE.Vector3());
+    info.push(object.isPoints ? 'point cloud' : 'mesh');
+    info.push(pos.count + ' vertices');
+    info.push(geo.index ? (geo.index.count / 3) + ' faces' : 'no faces');
+    info.push('size ' + s.x.toFixed(3) + 'x' + s.y.toFixed(3) + 'x' + s.z.toFixed(3));
+  }
+  return info.join(', ');
 }
 
 function pickCell() {
@@ -175,7 +202,7 @@ function renderList(filter) {
     li.onclick = () => {
       statusEl.textContent = 'Loading ' + name + '…';
       loadInto(pickCell(), name)
-        .then(() => statusEl.textContent = name)
+        .then(info => statusEl.textContent = name + ' — ' + info)
         .catch(e => { statusEl.textContent = 'Load error: ' + e.message; console.error(e); });
     };
     listEl.appendChild(li);
@@ -203,8 +230,8 @@ document.getElementById('reset').onclick = () => {
     if (meshes.length) {
       const c = pickCell();
       statusEl.textContent = 'Loading ' + meshes[0] + '…';
-      await loadInto(c, meshes[0]);
-      statusEl.textContent = meshes[0];
+      const info = await loadInto(c, meshes[0]);
+      statusEl.textContent = meshes[0] + ' — ' + info;
     } else statusEl.textContent = 'meshes/ folder is empty.';
   } catch (e) {
     statusEl.textContent = 'Error: ' + e.message;
