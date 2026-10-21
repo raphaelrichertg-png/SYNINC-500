@@ -17,6 +17,19 @@ const wireEl = document.getElementById('wireframe');
 const linkEl = document.getElementById('linkCam');
 const gridSel = document.getElementById('gridSize');
 
+// true if the color attribute actually varies (not all-zero / constant)
+function usableColors(geo) {
+  const col = geo.getAttribute('color');
+  if (!col) return false;
+  let min = Infinity, max = -Infinity;
+  for (let i = 0; i < col.count; i++) {
+    const v = col.getX(i) + col.getY(i) + col.getZ(i);
+    if (v < min) min = v;
+    if (v > max) max = v;
+  }
+  return (max - min) > 1e-6;
+}
+
 class Cell {
   constructor() {
     this.el = document.createElement('div');
@@ -34,12 +47,16 @@ class Cell {
     this.el.appendChild(this.renderer.domElement);
     this.scene = new THREE.Scene();
     this.scene.background = new THREE.Color(0x14171a);
-    this.camera = new THREE.PerspectiveCamera(45, 1, 0.1, 1000);
+    this.camera = new THREE.PerspectiveCamera(45, 1, 0.001, 10000);
+    this.camera.position.set(0, 0, 2);
     this.controls = new OrbitControls(this.camera, this.renderer.domElement);
-    this.scene.add(new THREE.HemisphereLight(0xffffff, 0x333333, 1.1));
-    const dir = new THREE.DirectionalLight(0xffffff, 1.0);
+    this.scene.add(new THREE.HemisphereLight(0xffffff, 0x444444, 1.2));
+    const dir = new THREE.DirectionalLight(0xffffff, 1.2);
     dir.position.set(3, 5, 4);
     this.scene.add(dir);
+    const dir2 = new THREE.DirectionalLight(0xffffff, 0.6);
+    dir2.position.set(-3, -2, -4);
+    this.scene.add(dir2);
     this.group = new THREE.Group();
     this.scene.add(this.group);
     this.name = null;
@@ -62,11 +79,11 @@ class Cell {
     const box = new THREE.Box3().setFromObject(this.group);
     if (box.isEmpty()) return;
     const center = box.getCenter(new THREE.Vector3());
-    const size = box.getSize(new THREE.Vector3()).length() || 1;
+    const size = Math.max(box.getSize(new THREE.Vector3()).length(), 1e-6);
     this.controls.target.copy(center);
-    this.camera.position.copy(center).add(new THREE.Vector3(0, 0, size));
-    this.camera.near = Math.max(size / 100, 1e-6);
-    this.camera.far = Math.max(size * 100, 10);
+    this.camera.position.copy(center).add(new THREE.Vector3(0, 0, size * 1.2));
+    this.camera.near = size / 100;
+    this.camera.far = size * 100;
     this.camera.updateProjectionMatrix();
     this.controls.update();
   }
@@ -94,8 +111,8 @@ function animate() {
 animate();
 
 function baseMaterial() {
-  return new THREE.MeshStandardMaterial({
-    color: 0xe8e0d0, roughness: 0.45, metalness: 0.05,
+  return new THREE.MeshPhongMaterial({
+    color: 0xf2ead8, shininess: 30,
     transparent: true, opacity: opacityEl.value / 100,
     side: THREE.DoubleSide
   });
@@ -121,18 +138,18 @@ async function loadInto(cell, name) {
   } else if (/\.ply$/i.test(name)) {
     const geo = await new Promise((ok, ko) => new PLYLoader().load(url, ok, undefined, ko));
     const hasFaces = geo.index && geo.index.count > 0;
-    const hasNormals = !!geo.getAttribute('normal');
-    if (!hasNormals) geo.computeVertexNormals();
+    if (!geo.getAttribute('normal')) geo.computeVertexNormals();
+    const useColors = usableColors(geo);
     if (hasFaces) {
       const mat = baseMaterial();
-      if (geo.getAttribute('color')) { mat.vertexColors = true; mat.color.set(0xffffff); }
+      if (useColors) { mat.vertexColors = true; mat.color.set(0xffffff); }
       object = new THREE.Mesh(geo, mat);
     } else {
       const mat = new THREE.PointsMaterial({
-        color: 0xe8e0d0, size: 0.5, sizeAttenuation: true,
+        color: 0xf2ead8, size: 0.01, sizeAttenuation: true,
         transparent: true, opacity: opacityEl.value / 100
       });
-      if (geo.getAttribute('color')) { mat.vertexColors = true; mat.color.set(0xffffff); }
+      if (useColors) { mat.vertexColors = true; mat.color.set(0xffffff); }
       object = new THREE.Points(geo, mat);
     }
   } else {
@@ -157,6 +174,7 @@ async function loadInto(cell, name) {
     info.push(object.isPoints ? 'point cloud' : 'mesh');
     info.push(pos.count + ' vertices');
     info.push(geo.index ? (geo.index.count / 3) + ' faces' : 'no faces');
+    info.push('colors: ' + (usableColors(geo) ? 'yes' : 'no'));
     info.push('size ' + s.x.toFixed(3) + 'x' + s.y.toFixed(3) + 'x' + s.z.toFixed(3));
   }
   return info.join(', ');
