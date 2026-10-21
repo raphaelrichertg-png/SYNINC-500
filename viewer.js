@@ -17,7 +17,6 @@ const wireEl = document.getElementById('wireframe');
 const linkEl = document.getElementById('linkCam');
 const gridSel = document.getElementById('gridSize');
 
-// true if the color attribute actually varies (not all-zero / constant)
 function usableColors(geo) {
   const col = geo.getAttribute('color');
   if (!col) return false;
@@ -28,6 +27,24 @@ function usableColors(geo) {
     if (v > max) max = v;
   }
   return (max - min) > 1e-6;
+}
+
+// drop invalid/zero/NaN normals and recompute
+function fixNormals(geo) {
+  const n = geo.getAttribute('normal');
+  let bad = !n;
+  if (!bad) {
+    for (let i = 0; i < n.count; i++) {
+      const l = n.getX(i) * n.getX(i) + n.getY(i) * n.getY(i) + n.getZ(i) * n.getZ(i);
+      if (!(l > 0.01)) { bad = true; break; }  // catches zero and NaN
+    }
+  }
+  if (bad) {
+    geo.deleteAttribute('normal');
+    geo.computeVertexNormals();
+    return 'recomputed';
+  }
+  return 'ok';
 }
 
 class Cell {
@@ -50,11 +67,11 @@ class Cell {
     this.camera = new THREE.PerspectiveCamera(45, 1, 0.001, 10000);
     this.camera.position.set(0, 0, 2);
     this.controls = new OrbitControls(this.camera, this.renderer.domElement);
-    this.scene.add(new THREE.HemisphereLight(0xffffff, 0x444444, 1.2));
-    const dir = new THREE.DirectionalLight(0xffffff, 1.2);
+    this.scene.add(new THREE.HemisphereLight(0xffffff, 0x555555, 1.0));
+    const dir = new THREE.DirectionalLight(0xffffff, 1.5);
     dir.position.set(3, 5, 4);
     this.scene.add(dir);
-    const dir2 = new THREE.DirectionalLight(0xffffff, 0.6);
+    const dir2 = new THREE.DirectionalLight(0xffffff, 0.8);
     dir2.position.set(-3, -2, -4);
     this.scene.add(dir2);
     this.group = new THREE.Group();
@@ -81,7 +98,7 @@ class Cell {
     const center = box.getCenter(new THREE.Vector3());
     const size = Math.max(box.getSize(new THREE.Vector3()).length(), 1e-6);
     this.controls.target.copy(center);
-    this.camera.position.copy(center).add(new THREE.Vector3(0, 0, size * 1.2));
+    this.camera.position.copy(center).add(new THREE.Vector3(0, 0, size * 1.4));
     this.camera.near = size / 100;
     this.camera.far = size * 100;
     this.camera.updateProjectionMatrix();
@@ -131,14 +148,15 @@ wireEl.onchange = applyStyle;
 
 async function loadInto(cell, name) {
   const url = MESH_DIR + encodeURIComponent(name);
-  let object;
+  let object, normalsState = 'n/a';
   if (/\.stl$/i.test(name)) {
     const geo = await new Promise((ok, ko) => new STLLoader().load(url, ok, undefined, ko));
+    normalsState = fixNormals(geo);
     object = new THREE.Mesh(geo, baseMaterial());
   } else if (/\.ply$/i.test(name)) {
     const geo = await new Promise((ok, ko) => new PLYLoader().load(url, ok, undefined, ko));
+    normalsState = fixNormals(geo);
     const hasFaces = geo.index && geo.index.count > 0;
-    if (!geo.getAttribute('normal')) geo.computeVertexNormals();
     const useColors = usableColors(geo);
     if (hasFaces) {
       const mat = baseMaterial();
@@ -174,7 +192,7 @@ async function loadInto(cell, name) {
     info.push(object.isPoints ? 'point cloud' : 'mesh');
     info.push(pos.count + ' vertices');
     info.push(geo.index ? (geo.index.count / 3) + ' faces' : 'no faces');
-    info.push('colors: ' + (usableColors(geo) ? 'yes' : 'no'));
+    info.push('normals: ' + normalsState);
     info.push('size ' + s.x.toFixed(3) + 'x' + s.y.toFixed(3) + 'x' + s.z.toFixed(3));
   }
   return info.join(', ');
